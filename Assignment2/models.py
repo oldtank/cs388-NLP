@@ -172,7 +172,7 @@ class TypoClassifier(SentimentClassifier, nn.Module):
         self.prefix_embeddings = prefix_embeddings
         self.log_softmax = nn.LogSoftmax(dim=0)
 
-        self.embedding = self.prefix_embeddings.get_initialized_embedding_layer(frozen=True)
+        self.embedding = self.prefix_embeddings.get_initialized_embedding_layer(frozen=False)
 
         layers =[
             nn.Linear(in_features=embedding_dim, out_features=hidden_size),
