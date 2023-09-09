@@ -70,14 +70,8 @@ class NeuralSentimentClassifier(SentimentClassifier, nn.Module):
         return self.network(avg)
 
     def predict(self, ex_words: List[str], has_typos: bool) -> int:
-        word_indices = []
-        for word in ex_words:
-            word_index = self.word_embeddings.word_indexer.index_of(word)
-            if word_index != -1:
-                word_indices.append(word_index)
-            else:
-                word_indices.append(self.word_embeddings.word_indexer.index_of("UNK"))
-        output = self.forward(torch.tensor(word_indices))
+        word_indices = get_word_indices(ex_words, self.word_embeddings.word_indexer)
+        output = self.forward(word_indices)
         log_probs = self.log_softmax(output)
         return torch.argmax(log_probs).item()
 
@@ -190,20 +184,8 @@ class TypoClassifier(SentimentClassifier, nn.Module):
         return self.network(avg)
 
     def predict(self, ex_words: List[str], has_typos: bool) -> int:
-        word_indices = []
-        for word in ex_words:
-            word_index = self.prefix_embeddings.word_indexer.index_of(word)
-            prefix_index= self.prefix_embeddings.word_indexer.index_of('prefix:' + word[0:3])
-            if word_index != -1:
-                word_indices.append(word_index)
-            else:
-                if prefix_index != -1:
-                    word_indices.append(prefix_index)
-
-                else :
-                    word_indices.append(self.prefix_embeddings.word_indexer.index_of("UNK"))
-
-        output = self.forward(torch.tensor(word_indices))
+        word_indices = get_word_indices_with_prefix(ex_words, self.prefix_embeddings.word_indexer)
+        output = self.forward(word_indices)
         log_probs = self.log_softmax(output)
         return torch.argmax(log_probs).item()
 
@@ -257,7 +239,7 @@ def train_deep_averaging_network(args, train_exs: List[SentimentExample], dev_ex
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     loss_fn = torch.nn.CrossEntropyLoss()
 
-    total_epoch = 3 if train_model_for_typo_setting else args.num_epochs
+    total_epoch = 5 if train_model_for_typo_setting else args.num_epochs
 
     for epoch in range(total_epoch):
         ex_indices = [i for i in range(0, len(training_data))]
