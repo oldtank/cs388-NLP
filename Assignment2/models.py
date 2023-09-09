@@ -246,10 +246,7 @@ def train_deep_averaging_network(args, train_exs: List[SentimentExample], dev_ex
     for the two settings.
     """
 
-    if args.dev_only:
-        training_data=dev_exs
-    else:
-        training_data = train_exs
+    training_data = train_exs
 
     if train_model_for_typo_setting:
         prefix_embeddings = read_prefix_embeddings(args.word_vecs_path)
@@ -260,7 +257,9 @@ def train_deep_averaging_network(args, train_exs: List[SentimentExample], dev_ex
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     loss_fn = torch.nn.CrossEntropyLoss()
 
-    for epoch in range(args.num_epochs):
+    total_epoch = 3 if train_model_for_typo_setting else args.num_epochs
+
+    for epoch in range(total_epoch):
         ex_indices = [i for i in range(0, len(training_data))]
         random.shuffle(ex_indices)
         total_loss = 0.0
