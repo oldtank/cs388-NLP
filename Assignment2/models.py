@@ -101,6 +101,9 @@ class PrefixEmbeddings:
         :param word: The word to look up
         :return: The UNK vector if the word is not in the Indexer or the vector otherwise
         """
+        if len(word) > 3:
+            word = word[0:3]
+
         word_idx = self.word_indexer.index_of(word)
         if word_idx != -1:
             return self.vectors[word_idx]
@@ -132,27 +135,38 @@ def read_prefix_embeddings(embeddings_file: str) -> PrefixEmbeddings:
             numbers = line[space_idx+1:]
             float_numbers = [float(number_str) for number_str in numbers.split()]
             vector = np.array(float_numbers)
-            word_indexer.add_and_get_index(word)
-            # Append the PAD and UNK vectors to start. Have to do this weirdly because we need to read the first line
-            # of the file to see what the embedding dim is
             if len(vectors) == 0:
                 vectors.append(np.zeros(vector.shape[0]))
                 vectors.append(np.zeros(vector.shape[0]))
-            vectors.append(vector)
+
+            if len(word) > 3:
+                word = word[0:3]
+
+            if word_indexer.index_of(word) > 0:
+                index = word_indexer.index_of(word)
+                existing_vector = vectors[index]
+                existing_count = prefix_counts[word]
+                vectors[index] = (existing_vector * existing_count + vector) / (existing_count + 1)
+                prefix_counts[word] = existing_count + 1
+            else:
+                word_indexer.add_and_get_index(word)
+                vectors.append(vector)
+                prefix_counts[word] = 1
+
+            # vectors.append(vector)
 
             # handle the prefix vector
-            prefix = 'prefix:' + word[0:3]
-            if word_indexer.index_of(prefix) > 0:
-                index = word_indexer.index_of(prefix)
-                existing_vector = vectors[index]
-                existing_count = prefix_counts[prefix]
-                vectors[index] = (existing_vector * existing_count + vector) / (existing_count + 1)
-                prefix_counts[prefix] = existing_count + 1
-            else:
-                word_indexer.add_and_get_index(prefix)
-                vectors.append(vector)
-                prefix_counts[prefix] = 1
-
+            # prefix = 'prefix:' + word[0:3]
+            # if word_indexer.index_of(prefix) > 0:
+            #     index = word_indexer.index_of(prefix)
+            #     existing_vector = vectors[index]
+            #     existing_count = prefix_counts[prefix]
+            #     vectors[index] = (existing_vector * existing_count + vector) / (existing_count + 1)
+            #     prefix_counts[prefix] = existing_count + 1
+            # else:
+            #     word_indexer.add_and_get_index(prefix)
+            #     vectors.append(vector)
+            #     prefix_counts[prefix] = 1
 
     f.close()
     print("Read in " + repr(len(word_indexer)) + " vectors of size " + repr(vectors[0].shape[0]))
@@ -204,15 +218,13 @@ def get_word_indices(sentence:List[str], indexer:Indexer):
 def get_word_indices_with_prefix(sentence:List[str], indexer:Indexer):
     word_indices = []
     for word in sentence:
+        if len(word) > 3:
+            word = word[0:3]
         word_index = indexer.index_of(word)
-        prefix_index = indexer.index_of('prefix:' + word[0:3])
         if word_index != -1:
             word_indices.append(word_index)
         else:
-            if prefix_index != -1:
-                word_indices.append(prefix_index)
-            else:
-                word_indices.append(indexer.index_of("UNK"))
+            word_indices.append(indexer.index_of("UNK"))
     return torch.tensor(word_indices)
 
 def train_deep_averaging_network(args, train_exs: List[SentimentExample], dev_exs: List[SentimentExample],
@@ -239,7 +251,7 @@ def train_deep_averaging_network(args, train_exs: List[SentimentExample], dev_ex
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     loss_fn = torch.nn.CrossEntropyLoss()
 
-    total_epoch = 5 if train_model_for_typo_setting else args.num_epochs
+    total_epoch = 3 if train_model_for_typo_setting else args.num_epochs
 
     for epoch in range(total_epoch):
         ex_indices = [i for i in range(0, len(training_data))]
