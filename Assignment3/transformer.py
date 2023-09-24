@@ -40,11 +40,7 @@ class Transformer(nn.Module):
         """
         super().__init__()
         self.embedding = torch.nn.Embedding(embedding_dim=d_model, num_embeddings=vocab_size)
-        self.transformers = []
-        for i in range(num_layers):
-            self.transformers.append(
-                TransformerLayer(d_model, d_internal)
-            )
+        self.transformer_layer = TransformerLayer(d_model, d_internal)
         self.linear = torch.nn.Linear(in_features=d_model, out_features=num_classes)
         self.softmax = torch.nn.LogSoftmax(dim=1)
         self.relu = torch.nn.ReLU()
@@ -57,24 +53,15 @@ class Transformer(nn.Module):
         :return: A tuple of the softmax log probabilities (should be a 20x3 matrix) and a list of the attention
         maps you use in your layers (can be variable length, but each should be a 20x20 matrix)
         """
-        # input_embedding = np.zeros(shape=(20, 27))
-        # # print(len(indices))
-        # for i in range(len(indices)):
-        #     # print('got here: '+ repr(indices[i]))
-        #     input_embedding[i][indices[i]] = 1
-        #
-        # input = torch.tensor(input_embedding).float()
         embedding = self.embedding(indices)
         self.attention_maps = []
         # positional encoding
 
         # transformer layers
-        for layer in self.transformers:
-            (transformer_output, attention) = layer(embedding)
-            self.attention_maps.append(attention)
-            embedding = transformer_output
+        (transformer_output, attention) = self.transformer_layer(embedding)
+        self.attention_maps.append(attention)
 
-        log_probs = self.softmax(self.relu(self.linear(embedding)))
+        log_probs = self.softmax(self.relu(self.linear(transformer_output)))
         # print(log_probs)
         return (log_probs, self.attention_maps)
 
