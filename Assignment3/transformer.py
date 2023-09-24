@@ -72,36 +72,36 @@ class Transformer(nn.Module):
             (transformer_output, attention) = layer(input)
             self.attention_maps.append(attention)
             input = transformer_output
-        log_probs = self.softmax(self.linear(input))
 
-        # log_probs = self.softmax(self.relu(self.linear(input)))
+        log_probs = self.softmax(self.relu(self.linear(input)))
         # print(log_probs)
         return (log_probs, self.attention_maps)
 
 
-class FFN(nn.Module):
-    def __init__(self, dim):
-        super().__init__()
-        self.identity = torch.nn.Identity()
-        self.relu = torch.nn.ReLU()
-
-        layers = [
-            torch.nn.Linear(in_features=dim, out_features=100),
-            torch.nn.ReLU(),
-            torch.nn.Linear(in_features=100, out_features=dim)
-        ]
-        self.network = torch.nn.Sequential(*layers)
-
-    def forward(self, x):
-        identify = self.identity(x)
-        output = self.network(x)
-        # output += identify
-        return x + output
-        # return self.relu(output)
-
 # Your implementation of the Transformer layer goes here. It should take vectors and return the same number of vectors
 # of the same length, applying self-attention, the feedforward layer, etc.
 class TransformerLayer(nn.Module):
+    class FFN(nn.Module):
+        def __init__(self, dim):
+            super().__init__()
+            self.identity = torch.nn.Identity()
+            self.relu = torch.nn.ReLU()
+
+            layers = [
+                torch.nn.Linear(in_features=dim, out_features=100),
+                torch.nn.ReLU(),
+                torch.nn.Linear(in_features=100, out_features=dim)
+            ]
+            self.network = torch.nn.Sequential(*layers)
+
+        def forward(self, x):
+            identify = self.identity(x)
+            output = self.network(x)
+            return output
+            # output += identify
+            # return x + output
+            # return self.relu(output)
+
     def __init__(self, d_model, d_internal):
         """
         :param d_model: The dimension of the inputs and outputs of the layer (note that the inputs and outputs
@@ -111,8 +111,6 @@ class TransformerLayer(nn.Module):
         """
         super().__init__()
 
-        self.d_k = d_internal
-
         # attention
         self.w_q = torch.nn.Linear(in_features=d_model, out_features=d_internal)
         self.w_k = torch.nn.Linear(in_features=d_model, out_features=d_internal)
@@ -121,7 +119,7 @@ class TransformerLayer(nn.Module):
         # output weight
         self.w_o = torch.nn.Linear(in_features=d_internal, out_features=d_model)
 
-        self.ffn = FFN(dim=d_model)
+        self.ffn = self.FFN(dim=d_model)
         self.softmax_fn = torch.nn.Softmax(dim=1)
         self.scale_factor = torch.sqrt(torch.FloatTensor([d_internal]))  # Scaling factor
 
@@ -134,15 +132,14 @@ class TransformerLayer(nn.Module):
         # print('Q: ' + repr(Q.shape) + '; K: ' + repr(K.shape) + '; V: ' + repr(V.shape))
         softmax_input = torch.matmul(Q, torch.transpose(K, 0, 1)) / self.scale_factor
         softmax = self.softmax_fn(softmax_input)
-        print('softmax shape: ' + repr(softmax))
+        # print('softmax shape: ' + repr(softmax))
         attention = torch.matmul(softmax, V)
 
         # print('attention shape: ' + repr(attention.shape))
         attention_output = self.w_o(attention)
         # print('attention output shape: ' + repr(attention_output.shape))
-        # ffn_output = self.ffn(attention_output)
+        ffn_output = self.ffn(attention_output)
         # print('ffn output shape: ' + repr(ffn_output.shape))
-        ffn_output = attention_output
         return (ffn_output, attention)
 
 
@@ -187,12 +184,11 @@ def train_classifier(args, train, dev):
     # (output, attentions) = model_test.forward(dev[0].input_tensor)
     # return 0
 
-    # The following code DOES NOT WORK but can be a starting point for your implementation
-    # Some suggested snippets to use:
     model = Transformer(vocab_size=27, num_positions=20, d_model=27, d_internal=18, num_classes=3, num_layers=1)
     model.zero_grad()
     model.train()
-    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    loss_fcn = nn.NLLLoss()
 
     num_epochs = 10
     for t in range(0, num_epochs):
@@ -201,13 +197,12 @@ def train_classifier(args, train, dev):
         # You can use batching if you'd like
         ex_idxs = [i for i in range(0, len(train))]
         random.shuffle(ex_idxs)
-        loss_fcn = nn.NLLLoss()
         for ex_idx in ex_idxs:
             example = train[ex_idx]
             (output, attention_map) = model(example.input_tensor)
 
             predictions = np.argmax(output.detach().numpy(), axis=1)
-            print(predictions)
+            # print(predictions)
 
             loss = loss_fcn(output, example.output_tensor)
             loss_this_epoch += loss.item()
