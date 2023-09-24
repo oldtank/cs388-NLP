@@ -72,7 +72,7 @@ class Transformer(nn.Module):
         for layer in self.transformers:
             (transformer_output, attention) = layer(embedding)
             self.attention_maps.append(attention)
-            input = transformer_output
+            embedding = transformer_output
 
         log_probs = self.softmax(self.relu(self.linear(embedding)))
         # print(log_probs)
