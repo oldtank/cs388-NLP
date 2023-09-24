@@ -94,12 +94,11 @@ class TransformerLayer(nn.Module):
                 torch.nn.Linear(in_features=100, out_features=dim)
             ]
             self.network = torch.nn.Sequential(*layers)
+            self.norm = torch.nn.LayerNorm([dim])
 
         def forward(self, x):
-            identify = self.identity(x)
             output = self.network(x)
-            return output + x
-            # return self.relu(output)
+            return self.norm(output + x)
 
     def __init__(self, d_model, d_internal):
         """
@@ -121,7 +120,7 @@ class TransformerLayer(nn.Module):
         self.ffn = self.FFN(dim=d_model)
         self.softmax_fn = torch.nn.Softmax(dim=1)
         self.scale_factor = torch.sqrt(torch.FloatTensor([d_internal]))
-
+        self.norm = torch.nn.LayerNorm([d_model])
 
     def forward(self, input_vecs):
         Q = self.w_q(input_vecs)
@@ -139,6 +138,8 @@ class TransformerLayer(nn.Module):
 
         # residual
         attention_output += input_vecs
+
+        attention_output = self.norm(attention_output)
 
         # print('attention output shape: ' + repr(attention_output.shape))
         ffn_output = self.ffn(attention_output)
@@ -187,7 +188,7 @@ def train_classifier(args, train, dev):
     # (output, attentions) = model_test.forward(dev[0].input_tensor)
     # return 0
 
-    model = Transformer(vocab_size=27, num_positions=20, d_model=5, d_internal=3, num_classes=3, num_layers=1)
+    model = Transformer(vocab_size=27, num_positions=20, d_model=64, d_internal=50, num_classes=3, num_layers=1)
     model.zero_grad()
     # model.train()
     optimizer = optim.Adam(model.parameters(), lr=0.0001)
