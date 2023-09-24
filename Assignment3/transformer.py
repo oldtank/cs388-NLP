@@ -97,9 +97,7 @@ class TransformerLayer(nn.Module):
         def forward(self, x):
             identify = self.identity(x)
             output = self.network(x)
-            return output
-            # output += identify
-            # return x + output
+            return output + x
             # return self.relu(output)
 
     def __init__(self, d_model, d_internal):
@@ -121,7 +119,7 @@ class TransformerLayer(nn.Module):
 
         self.ffn = self.FFN(dim=d_model)
         self.softmax_fn = torch.nn.Softmax(dim=1)
-        self.scale_factor = torch.sqrt(torch.FloatTensor([d_internal]))  # Scaling factor
+        self.scale_factor = torch.sqrt(torch.FloatTensor([d_internal]))
 
 
     def forward(self, input_vecs):
@@ -137,6 +135,10 @@ class TransformerLayer(nn.Module):
 
         # print('attention shape: ' + repr(attention.shape))
         attention_output = self.w_o(attention)
+
+        # residual
+        attention_output += input_vecs
+
         # print('attention output shape: ' + repr(attention_output.shape))
         ffn_output = self.ffn(attention_output)
         # print('ffn output shape: ' + repr(ffn_output.shape))
@@ -201,13 +203,12 @@ def train_classifier(args, train, dev):
             example = train[ex_idx]
             (output, attention_map) = model(example.input_tensor)
 
-            predictions = np.argmax(output.detach().numpy(), axis=1)
+            # predictions = np.argmax(output.detach().numpy(), axis=1)
             # print(predictions)
-
             loss = loss_fcn(output, example.output_tensor)
             loss_this_epoch += loss.item()
 
-            model.zero_grad()
+            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
         print('loss at this epoch: ' + repr(loss_this_epoch))
