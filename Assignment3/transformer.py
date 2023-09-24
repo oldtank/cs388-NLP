@@ -214,7 +214,7 @@ def train_classifier(args, train, dev):
 
             # predictions = np.argmax(output.detach().numpy(), axis=1)
             # print(predictions)
-            loss = loss_fcn(output, example.output_tensor)
+            loss = loss_fcn(output, example.output_tensor.to(device))
             loss_this_epoch += loss.item()
 
             optimizer.zero_grad()
