@@ -39,6 +39,7 @@ class Transformer(nn.Module):
         :param num_layers: number of TransformerLayers to use; can be whatever you want
         """
         super().__init__()
+        self.embedding = torch.nn.Embedding(embedding_dim=d_model, num_embeddings=vocab_size)
         self.transformers = []
         for i in range(num_layers):
             self.transformers.append(
@@ -56,24 +57,24 @@ class Transformer(nn.Module):
         :return: A tuple of the softmax log probabilities (should be a 20x3 matrix) and a list of the attention
         maps you use in your layers (can be variable length, but each should be a 20x20 matrix)
         """
-        input_embedding = np.zeros(shape=(20, 27))
-        # print(len(indices))
-        for i in range(len(indices)):
-            # print('got here: '+ repr(indices[i]))
-            input_embedding[i][indices[i]] = 1
-
-        input = torch.tensor(input_embedding).float()
-
+        # input_embedding = np.zeros(shape=(20, 27))
+        # # print(len(indices))
+        # for i in range(len(indices)):
+        #     # print('got here: '+ repr(indices[i]))
+        #     input_embedding[i][indices[i]] = 1
+        #
+        # input = torch.tensor(input_embedding).float()
+        embedding = self.embedding(indices)
         self.attention_maps = []
         # positional encoding
 
         # transformer layers
         for layer in self.transformers:
-            (transformer_output, attention) = layer(input)
+            (transformer_output, attention) = layer(embedding)
             self.attention_maps.append(attention)
             input = transformer_output
 
-        log_probs = self.softmax(self.relu(self.linear(input)))
+        log_probs = self.softmax(self.relu(self.linear(embedding)))
         # print(log_probs)
         return (log_probs, self.attention_maps)
 
@@ -186,10 +187,10 @@ def train_classifier(args, train, dev):
     # (output, attentions) = model_test.forward(dev[0].input_tensor)
     # return 0
 
-    model = Transformer(vocab_size=27, num_positions=20, d_model=27, d_internal=18, num_classes=3, num_layers=1)
+    model = Transformer(vocab_size=27, num_positions=20, d_model=5, d_internal=3, num_classes=3, num_layers=1)
     model.zero_grad()
-    model.train()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    # model.train()
+    optimizer = optim.Adam(model.parameters(), lr=0.0001)
     loss_fcn = nn.NLLLoss()
 
     num_epochs = 10
@@ -212,7 +213,7 @@ def train_classifier(args, train, dev):
             loss.backward()
             optimizer.step()
         print('loss at this epoch: ' + repr(loss_this_epoch))
-    model.eval()
+    # model.eval()
     return model
 
 
