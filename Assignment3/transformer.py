@@ -182,6 +182,8 @@ class PositionalEncoding(nn.Module):
 
 # This is a skeleton for train_classifier: you can implement this however you want
 def train_classifier(args, train, dev):
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+
     # train  = dev
 
     # model_test = Transformer(vocab_size=27, num_positions=20, d_model=27, d_internal=20, num_classes=3, num_layers=1)
@@ -189,12 +191,14 @@ def train_classifier(args, train, dev):
     # return 0
 
     model = Transformer(vocab_size=27, num_positions=20, d_model=64, d_internal=50, num_classes=3, num_layers=1)
-    model.zero_grad()
-    # model.train()
+    if device is not None:
+        model = model.to(device)
+
+    model.train()
     optimizer = optim.Adam(model.parameters(), lr=0.0001)
     loss_fcn = nn.NLLLoss()
 
-    num_epochs = 10
+    num_epochs = 20
     for t in range(0, num_epochs):
         loss_this_epoch = 0.0
         random.seed(t)
@@ -203,7 +207,10 @@ def train_classifier(args, train, dev):
         random.shuffle(ex_idxs)
         for ex_idx in ex_idxs:
             example = train[ex_idx]
-            (output, attention_map) = model(example.input_tensor)
+            input_tensor = example.input_tensor
+            if device is not None:
+                input_tensor = input_tensor.to(device)
+            (output, attention_map) = model(input_tensor)
 
             # predictions = np.argmax(output.detach().numpy(), axis=1)
             # print(predictions)
@@ -214,7 +221,7 @@ def train_classifier(args, train, dev):
             loss.backward()
             optimizer.step()
         print('loss at this epoch: ' + repr(loss_this_epoch))
-    # model.eval()
+    model.eval()
     return model
 
 
